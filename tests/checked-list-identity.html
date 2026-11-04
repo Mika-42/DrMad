@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr">
+  <head><meta charset="UTF-8"><title>Identité des quantités</title></head>
+  <body>
+    <div id="app"></div><pre id="result">Contrôles en cours</pre>
+    <script type="module">
+      import {createApp, h, reactive, nextTick} from 'vue'
+      import CheckedList from '/src/components/CheckedList.vue'
+      const results=[]
+      const a={label:'premier'}, b={label:'second'}
+      const props=reactive({data:[a,b],fields:['label'],itemButton:{show:true,text:'Ajouter'},itemAmount:true})
+      try {
+        const app=createApp({render:()=>h(CheckedList,props)})
+        app.mount('#app');await nextTick()
+        let input=document.querySelector('input[type="number"]')
+        input.value='3';input.dispatchEvent(new Event('input',{bubbles:true}));await nextTick()
+        props.data=[b,a];await nextTick()
+        if(document.querySelectorAll('input[type="number"]')[1].value!=='3')throw Error('Quantité perdue au tri sans _id')
+        results.push('Quantité conservée pour un objet sans _id après tri')
+        props.data=[a,b];await nextTick()
+        if(document.querySelectorAll('input[type="number"]')[0].value!=='3')throw Error('Quantité perdue au renouvellement sans _id')
+        results.push('Quantité conservée après renouvellement de la liste brute')
+        app.unmount()
+        document.body.dataset.testStatus='passed'
+      }catch(error){document.body.dataset.testStatus='failed';results.push(error.stack);console.error(error)}
+      document.querySelector('#result').textContent=JSON.stringify({status:document.body.dataset.testStatus,checks:results},null,2)
+    </script>
+  </body>
+</html>

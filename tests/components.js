@@ -3,6 +3,7 @@ import { createApp, h, nextTick } from 'vue'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import NavBar from '../src/components/NavBar.vue'
 import VerticalMenu from '../src/components/VerticalMenu.vue'
+import CheckedList from '../src/components/CheckedList.vue'
 
 const results = []
 function check(condition, message) {
@@ -70,6 +71,35 @@ try {
   f.host.querySelector('[role="link"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
   await settle()
   check(f.router.currentRoute.value.path === '/one', 'VerticalMenu : activation clavier du lien personnalisé')
+  f.dispose()
+  const rows = [{ _id: 'a', first: 'alpha', second: 'un', hidden: 'secret' }, { _id: 'b', first: 'beta', second: 'deux' }]
+  const checked = [true, false]
+  let selectionEvent, itemEvent, listEvent
+  f = await fixture(CheckedList, { data: rows, fields: ['second', 'first'], itemCheck: true, checked,
+    itemButton: { show: true, text: 'Ajouter' }, listButton: { show: true, text: 'Grouper' }, itemAmount: true,
+    onCheckedChanged: index => { selectionEvent = index }, onItemButtonClicked: value => { itemEvent = value }, onListButtonClicked: value => { listEvent = value },
+  })
+  check(f.host.querySelectorAll('li').length === 2 && f.host.querySelector('li').textContent.trim().startsWith('unalpha'), 'CheckedList : lignes et ordre des seuls champs demandés')
+  check(!f.host.textContent.includes('secret'), 'CheckedList : champ non demandé masqué')
+  f.host.querySelectorAll('input[type="checkbox"]')[1].click()
+  check(selectionEvent === 1 && checked[1] === false, 'CheckedList : indice de changement et props intactes')
+  const number = f.host.querySelector('input[type="number"]')
+  number.value = '3'; number.dispatchEvent(new Event('input', { bubbles: true })); await nextTick()
+  f.host.querySelector('li button').click()
+  check(itemEvent?.index === 0 && itemEvent.amount === 3, 'CheckedList : indice et quantité de ligne émis')
+  f.host.querySelector('div > button').click()
+  check(listEvent?.length === 1 && listEvent[0].index === 0 && listEvent[0].amount === 3, 'CheckedList : payload groupé des seules cases contrôlées cochées')
+  number.value = '0'; number.dispatchEvent(new Event('input', { bubbles: true })); await nextTick()
+  check(f.host.querySelector('li button').disabled && f.host.querySelector('div > button').disabled, 'CheckedList : quantité invalide bloque ajout individuel et groupé')
+  number.value = '1.5'; number.dispatchEvent(new Event('input', { bubbles: true })); await nextTick()
+  check(f.host.querySelector('li button').disabled, 'CheckedList : quantité fractionnaire refusée')
+  f.dispose()
+  f = await fixture(CheckedList)
+  check(f.host.querySelectorAll('li,input,button').length === 0, 'CheckedList : zéro ligne et aucune option, aucun contrôle parasite')
+  f.dispose()
+  f = await fixture(CheckedList, { data: [rows[0]], fields: ['first'], itemButton: { show: true, text: 'Retirer' }, onItemButtonClicked: value => { itemEvent = value } })
+  f.host.querySelector('button').click()
+  check(itemEvent === 0 && f.host.querySelectorAll('input').length === 0, 'CheckedList : une ligne sans quantité émet son indice')
   f.dispose()
   document.body.dataset.testStatus = 'passed'
 } catch (error) {
