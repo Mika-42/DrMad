@@ -1,9 +1,10 @@
 // Page de vérification navigateur, sans framework ni dépendance de tests.
-import { createApp, h, nextTick } from 'vue'
+import { createApp, h, nextTick, reactive } from 'vue'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import NavBar from '../src/components/NavBar.vue'
 import VerticalMenu from '../src/components/VerticalMenu.vue'
 import CheckedList from '../src/components/CheckedList.vue'
+import DataTable from '../src/components/DataTable.vue'
 
 const results = []
 function check(condition, message) {
@@ -100,6 +101,37 @@ try {
   f = await fixture(CheckedList, { data: [rows[0]], fields: ['first'], itemButton: { show: true, text: 'Retirer' }, onItemButtonClicked: value => { itemEvent = value } })
   f.host.querySelector('button').click()
   check(itemEvent === 0 && f.host.querySelectorAll('input').length === 0, 'CheckedList : une ligne sans quantité émet son indice')
+  f.dispose()
+  const headers = [{ label: 'Second', name: 'second' }, { label: 'Premier', name: 'first' }]
+  for (const [itemCheck, itemButton] of [[false, false], [true, false], [false, true], [true, true]]) {
+    f = await fixture(DataTable, { items: rows, headers, itemCheck, itemButton })
+    const count = 2 + Number(itemCheck) + Number(itemButton)
+    check(f.host.querySelectorAll('th').length === count && f.host.querySelector('tbody tr').children.length === count, `DataTable : ${count} colonnes, check=${itemCheck}, button=${itemButton}`)
+    f.dispose()
+  }
+  let clickedItem, clickedTable
+  const tableProps = reactive({ items: rows, headers, itemCheck: true, itemButton: true, tableButton: true,
+    onItemClicked: item => { clickedItem = item }, onTableClicked: items => { clickedTable = items },
+  })
+  f = await fixture(DataTable, tableProps, { 'item-button': () => 'Détails', 'table-button': () => 'Voir' })
+  check(!f.host.textContent.includes('secret') && f.host.querySelector('tbody tr td:nth-child(2)').textContent === 'un', 'DataTable : projection ordonnée et champs supplémentaires masqués')
+  f.host.querySelectorAll('tbody button')[1].click()
+  check(clickedItem === tableProps.items[1] && clickedItem._id === 'b', 'DataTable : itemClicked renvoie l’objet complet exact')
+  f.host.querySelectorAll('input')[0].click(); f.host.querySelectorAll('input')[1].click(); await nextTick()
+  f.host.querySelector('div > button').click()
+  check(clickedTable?.length === 2 && clickedTable[0] === tableProps.items[0] && clickedTable[1] === tableProps.items[1], 'DataTable : tableClicked renvoie tous les objets exacts cochés')
+  check(f.host.querySelector('tbody button').textContent === 'Détails' && f.host.querySelector('div > button').textContent === 'Voir', 'DataTable : slots de labels personnalisés')
+  tableProps.items = [rows[1]]; await nextTick()
+  f.host.querySelector('div > button').click()
+  check(clickedTable?.length === 1 && clickedTable[0]._id === 'b', 'DataTable : une ligne filtrée ne reste pas dans la sélection envoyée')
+  tableProps.items = rows; await nextTick()
+  check(!f.host.querySelectorAll('input')[0].checked && f.host.querySelectorAll('input')[1].checked, 'DataTable : restauration sans resélectionner une ligne masquée')
+  tableProps.itemCheck = false; await nextTick()
+  f.host.querySelector('div > button').click()
+  check(clickedTable?.length === 0, 'DataTable : masquer les cases efface la sélection')
+  f.dispose()
+  f = await fixture(DataTable, { headers })
+  check(f.host.querySelectorAll('tbody tr').length === 0 && f.host.querySelectorAll('th').length === 2, 'DataTable : table vide garde les seuls en-têtes demandés')
   f.dispose()
   document.body.dataset.testStatus = 'passed'
 } catch (error) {
