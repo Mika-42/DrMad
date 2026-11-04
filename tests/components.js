@@ -2,6 +2,7 @@
 import { createApp, h, nextTick } from 'vue'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import NavBar from '../src/components/NavBar.vue'
+import VerticalMenu from '../src/components/VerticalMenu.vue'
 
 const results = []
 function check(condition, message) {
@@ -45,6 +46,30 @@ try {
   f.dispose()
   f = await fixture(NavBar)
   check(f.host.querySelectorAll('button').length === 0, 'NavBar : liste vide sans contrôle parasite')
+  f.dispose()
+  f = await fixture(VerticalMenu, { items: [
+    { type: 'title', label: 'Titre' }, { type: 'link', label: 'Un', to: '/one' },
+    { type: 'inconnu', label: 'Invisible' },
+  ] })
+  check(f.host.querySelectorAll('button').length === 1 && !f.host.textContent.includes('Invisible'), 'VerticalMenu : seuls les types title/link sont rendus')
+  f.host.querySelector('nav > span').click(); await settle()
+  check(f.router.currentRoute.value.path === '/', 'VerticalMenu : titre sans navigation')
+  f.host.querySelector('button').click(); await settle()
+  check(f.router.currentRoute.value.path === '/one', 'VerticalMenu : lien actif suit sa route')
+  f.dispose()
+  f = await fixture(VerticalMenu, { disabled: true, items: [{ type: 'link', label: 'Un', to: '/one' }] }, {
+    'menu-link': ({ label }) => h('button', label),
+  })
+  f.host.querySelector('button').click(); await settle()
+  check(f.router.currentRoute.value.path === '/', 'VerticalMenu : disabled bloque aussi le contenu personnalisé')
+  f.dispose()
+  f = await fixture(VerticalMenu, { items: [
+    { type: 'title', label: 'Titre' }, { type: 'link', label: 'Un', to: '/one' },
+  ] }, { 'menu-title': ({ label }) => h('strong', label), 'menu-link': ({ label }) => h('em', label) })
+  check(f.host.querySelector('strong')?.textContent === 'Titre' && f.host.querySelector('em')?.textContent === 'Un', 'VerticalMenu : les deux slots reçoivent label')
+  f.host.querySelector('[role="link"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+  await settle()
+  check(f.router.currentRoute.value.path === '/one', 'VerticalMenu : activation clavier du lien personnalisé')
   f.dispose()
   document.body.dataset.testStatus = 'passed'
 } catch (error) {
